@@ -31,11 +31,7 @@ jobs:
         id: save_summary
         run: |
           COUNT=$(jq 'length' trufflehog_report.json 2>/dev/null || echo 0)
-          if [ "$COUNT" -eq 0 ]; then
-            echo "summary=✅ Secret Scan: Clean" >> $GITHUB_OUTPUT
-          else
-            echo "summary=❌ Secret Scan: $COUNT findings" >> $GITHUB_OUTPUT
-          fi
+          echo "summary=$COUNT findings" >> $GITHUB_OUTPUT
 
   snyk-scan:
     runs-on: ubuntu-latest
@@ -80,11 +76,7 @@ jobs:
         id: save_summary
         run: |
           COUNT=$(jq '.vulnerabilities | length' snyk_report.json 2>/dev/null || echo 0)
-          if [ "$COUNT" -eq 0 ]; then
-            echo "summary=✅ SCA: Clean" >> $GITHUB_OUTPUT
-          else
-            echo "summary=❌ SCA: $COUNT vulnerabilities" >> $GITHUB_OUTPUT
-          fi
+          echo "summary=$COUNT vulnerabilities" >> $GITHUB_OUTPUT
 
   sast-scan:
     runs-on: ubuntu-latest
@@ -111,11 +103,7 @@ jobs:
         id: save_summary
         run: |
           COUNT=$(jq '.results | length' bandit_report.json 2>/dev/null || echo 0)
-          if [ "$COUNT" -eq 0 ]; then
-            echo "summary=✅ SAST: Clean" >> $GITHUB_OUTPUT
-          else
-            echo "summary=❌ SAST: $COUNT issues" >> $GITHUB_OUTPUT
-          fi
+          echo "summary=$COUNT issues" >> $GITHUB_OUTPUT
 
   dast-scan:
     runs-on: ubuntu-latest
@@ -156,11 +144,7 @@ jobs:
             WARN=0
             FAIL=0
           fi
-          if [ "$WARN" -eq 0 ] && [ "$FAIL" -eq 0 ]; then
-            echo "summary=✅ DAST: Clean" >> $GITHUB_OUTPUT
-          else
-            echo "summary=❌ DAST: $WARN warnings, $FAIL fails" >> $GITHUB_OUTPUT
-          fi
+          echo "summary=$WARN warnings, $FAIL fails" >> $GITHUB_OUTPUT
 
   notify:
     runs-on: ubuntu-latest
@@ -169,22 +153,28 @@ jobs:
       - name: Notify Discord
         if: always()
         run: |
-          SECRET="${{ needs.secret-scan.outputs.secret_summary }}"
-          SCA="${{ needs.snyk-scan.outputs.sca_summary }}"
-          SAST="${{ needs.sast-scan.outputs.sast_summary }}"
-          DAST="${{ needs.dast-scan.outputs.dast_summary }}"
+          SECRET_COUNT="${{ needs.secret-scan.outputs.secret_summary }}"
+          SCA_COUNT="${{ needs.snyk-scan.outputs.sca_summary }}"
+          SAST_COUNT="${{ needs.sast-scan.outputs.sast_summary }}"
+          DAST_COUNT="${{ needs.dast-scan.outputs.dast_summary }}"
 
           # fallback
-          [ -z "$SECRET" ] && SECRET="✅ Secret Scan: Clean"
-          [ -z "$SCA" ] && SCA="✅ SCA: Clean"
-          [ -z "$SAST" ] && SAST="✅ SAST: Clean"
-          [ -z "$DAST" ] && DAST="✅ DAST: Clean"
+          [ -z "$SECRET_COUNT" ] && SECRET_COUNT="0 findings"
+          [ -z "$SCA_COUNT" ] && SCA_COUNT="0 vulnerabilities"
+          [ -z "$SAST_COUNT" ] && SAST_COUNT="0 issues"
+          [ -z "$DAST_COUNT" ] && DAST_COUNT="0 warnings, 0 fails"
 
-          # get timestamp
           TIME=$(TZ=Asia/Jakarta date "+%Y-%m-%d %H:%M WIB")
           STATUS="completed"
 
-          CONTENT="🚨 DevSecOps Pipeline Report 🚨\n\n$SECRET\n$SCA\n$SAST\n$DAST\n\n🔗 Repo: vuln-bank\n🕐 Time: $TIME\n👉 https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          CONTENT="🚨 DevSecOps Pipeline Report 🚨\n"
+          CONTENT+="🔑 Secret Scan: $SECRET_COUNT\n"
+          CONTENT+="🪲 SCA (Snyk): $SCA_COUNT\n"
+          CONTENT+="🧩 SAST (Bandit): $SAST_COUNT\n"
+          CONTENT+="🛡️ DAST (ZAP): $DAST_COUNT\n"
+          CONTENT+="Pipeline status: $STATUS\n"
+          CONTENT+="🕐 Time: $TIME\n"
+          CONTENT+="👉 https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
           echo "$CONTENT" > summary.txt
 
@@ -193,11 +183,12 @@ jobs:
             -d "{\"content\": \"$CONTENT\"}" \
             ${{ secrets.DISCORD_WEBHOOK_URL }}
 
-      - name: Upload summary artifact
+      - name: Upload summary
         uses: actions/upload-artifact@v4
         with:
           name: devsecops-summary
           path: summary.txt
+
 
       # ⚠️ uncomment kalau mau upload full ZAP report
       # - name: Upload Full ZAP Report
