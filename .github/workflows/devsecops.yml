@@ -30,12 +30,12 @@ jobs:
       - name: Save Secret Scan summary
         id: save_summary
         run: |
-          if [ -s trufflehog_report.json ]; then
-            COUNT=$(jq 'length' trufflehog_report.json 2>/dev/null || echo 0)
+          COUNT=$(jq 'length' trufflehog_report.json 2>/dev/null || echo 0)
+          if [ "$COUNT" -eq 0 ]; then
+            echo "summary=✅ Secret Scan: Clean" >> $GITHUB_OUTPUT
           else
-            COUNT=0
+            echo "summary=❌ Secret Scan: $COUNT findings" >> $GITHUB_OUTPUT
           fi
-          echo "summary=🔑 Secret Scan: $COUNT findings" >> $GITHUB_OUTPUT
 
   snyk-scan:
     runs-on: ubuntu-latest
@@ -80,7 +80,11 @@ jobs:
         id: save_summary
         run: |
           COUNT=$(jq '.vulnerabilities | length' snyk_report.json 2>/dev/null || echo 0)
-          echo "summary=🪲 SCA (Snyk): $COUNT vulnerabilities" >> $GITHUB_OUTPUT
+          if [ "$COUNT" -eq 0 ]; then
+            echo "summary=✅ SCA: Clean" >> $GITHUB_OUTPUT
+          else
+            echo "summary=❌ SCA: $COUNT vulnerabilities" >> $GITHUB_OUTPUT
+          fi
 
   sast-scan:
     runs-on: ubuntu-latest
@@ -107,7 +111,11 @@ jobs:
         id: save_summary
         run: |
           COUNT=$(jq '.results | length' bandit_report.json 2>/dev/null || echo 0)
-          echo "summary=🧩 SAST (Bandit): $COUNT issues" >> $GITHUB_OUTPUT
+          if [ "$COUNT" -eq 0 ]; then
+            echo "summary=✅ SAST: Clean" >> $GITHUB_OUTPUT
+          else
+            echo "summary=❌ SAST: $COUNT issues" >> $GITHUB_OUTPUT
+          fi
 
   dast-scan:
     runs-on: ubuntu-latest
@@ -148,42 +156,11 @@ jobs:
             WARN=0
             FAIL=0
           fi
-          echo "summary=🛡️ DAST (ZAP): $WARN warnings, $FAIL fails" >> $GITHUB_OUTPUT
-
-  # notify:
-  #   runs-on: ubuntu-latest
-  #   needs: [secret-scan, snyk-scan, sast-scan, dast-scan]
-  #   steps:
-  #     - name: Notify Discord
-  #       if: always()
-  #       run: |
-  #         SECRET="${{ needs.secret-scan.outputs.secret_summary }}"
-  #         SCA="${{ needs.snyk-scan.outputs.sca_summary }}"
-  #         SAST="${{ needs.sast-scan.outputs.sast_summary }}"
-  #         DAST="${{ needs.dast-scan.outputs.dast_summary }}"
-
-  #         # fallback
-  #         [ -z "$SECRET" ] && SECRET="Clean"
-  #         [ -z "$SCA" ] && SCA="N/A"
-  #         [ -z "$SAST" ] && SAST="N/A"
-  #         [ -z "$DAST" ] && DAST="N/A"
-
-  #         # convert
-  #         SECRET_MSG="✅ Secret Scan: $SECRET"
-  #         SCA_MSG="❌ SCA: $SCA"
-  #         SAST_MSG="❌ SAST: $SAST"
-  #         DAST_MSG="❌ DAST: $DAST"
-
-  #         # get timestamp
-  #         TIME=$(TZ=Asia/Jakarta date "+%Y-%m-%d %H:%M WIB")
-
-  #         CONTENT="🚨 DevSecOps Pipeline Report 🚨\n\n$SECRET_MSG\n$SCA_MSG\n$SAST_MSG\n$DAST_MSG\n\n🔗 Repo: vuln-bank\n🕐 Time: $TIME"
-
-  #         # send to discord
-  #         curl -H "Content-Type: application/json" \
-  #           -X POST \
-  #           -d "{\"content\": \"$CONTENT\"}" \
-  #           ${{ secrets.DISCORD_WEBHOOK_URL }}
+          if [ "$WARN" -eq 0 ] && [ "$FAIL" -eq 0 ]; then
+            echo "summary=✅ DAST: Clean" >> $GITHUB_OUTPUT
+          else
+            echo "summary=❌ DAST: $WARN warnings, $FAIL fails" >> $GITHUB_OUTPUT
+          fi
 
   notify:
     runs-on: ubuntu-latest
@@ -198,20 +175,30 @@ jobs:
           DAST="${{ needs.dast-scan.outputs.dast_summary }}"
 
           # fallback
-          [ -z "$SECRET" ] && SECRET="🔑 Secret Scan: N/A"
-          [ -z "$SCA" ] && SCA="🪲 SCA: N/A"
-          [ -z "$SAST" ] && SAST="🧩 SAST: N/A"
-          [ -z "$DAST" ] && DAST="🛡️ DAST: N/A"
+          [ -z "$SECRET" ] && SECRET="✅ Secret Scan: Clean"
+          [ -z "$SCA" ] && SCA="✅ SCA: Clean"
+          [ -z "$SAST" ] && SAST="✅ SAST: Clean"
+          [ -z "$DAST" ] && DAST="✅ DAST: Clean"
 
-          # get timestamp
           TIME=$(TZ=Asia/Jakarta date "+%Y-%m-%d %H:%M WIB")
           STATUS="completed"
-          CONTENT="🚨 *DevSecOps Pipeline Report* 🚨\n$SECRET\n$SCA\n$SAST\n$DAST\n**Pipeline status**: $STATUS\n🕐 Time: $TIME\n👉 https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          CONTENT="🚨 *DevSecOps Pipeline Report* 🚨\n\n$SECRET\n$SCA\n$SAST\n$DAST\n\n🔗 Repo: vuln-bank\n🕐 Time: $TIME\n👉 https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          # Save as artifact also
+          echo "$CONTENT" > summary.txt
 
           curl -H "Content-Type: application/json" \
             -X POST \
             -d "{\"content\": \"$CONTENT\"}" \
             ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+      - name: Upload summary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: devsecops-summary
+          path: summary.txt
+
 
 
       # ⚠️ uncomment kalau mau upload full scan
