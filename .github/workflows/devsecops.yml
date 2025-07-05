@@ -116,9 +116,16 @@ jobs:
       - name: Notify Discord
         if: always()
         run: |
-          SECRET="${{ needs.secret-scan.outputs.secret_summary || '🔑 Secret Scan: N/A' }}"
-          SCA="${{ needs.snyk-scan.outputs.sca_summary || '🪲 SCA: N/A' }}"
-          DAST="${{ steps.save_summary.outputs.summary || '🛡️ DAST: N/A' }}"
+          # fallback manual bash, bukan di ${{ }}
+          SECRET="${{ needs.secret-scan.outputs.secret_summary }}"
+          SCA="${{ needs.snyk-scan.outputs.sca_summary }}"
+          DAST="${{ steps.save_summary.outputs.summary }}"
+
+          # fallback kalau kosong
+          if [ -z "$SECRET" ]; then SECRET="🔑 Secret Scan: N/A"; fi
+          if [ -z "$SCA" ]; then SCA="🪲 SCA: N/A"; fi
+          if [ -z "$DAST" ]; then DAST="🛡️ DAST (ZAP): N/A"; fi
+
           STATUS="completed"
           curl -H "Content-Type: application/json" \
             -X POST \
@@ -127,7 +134,7 @@ jobs:
               $SECRET\n
               $SCA\n
               $DAST\n
-              **Pipeline status**: ${STATUS}\n
+              **Pipeline status**: $STATUS\n
               👉 [View artifact](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\"
             }" \
             ${{ secrets.DISCORD_WEBHOOK_URL }}
