@@ -11,47 +11,78 @@ on:
 jobs:
   secret-scan:
     runs-on: ubuntu-latest
+    outputs:
+      secret_summary: ${{ steps.save_summary.outputs.summary }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+
       - name: Install TruffleHog
         run: pip install trufflehog
+
       - name: Run TruffleHog
         run: trufflehog git file://. --json > trufflehog_report.json || true
+
       - name: Upload TruffleHog report
         uses: actions/upload-artifact@v4
         with:
           name: trufflehog-report
           path: trufflehog_report.json
 
+      - name: Save Secret Scan summary
+        id: save_summary
+        run: |
+          COUNT=$(jq '.[] | length' trufflehog_report.json)
+          echo "summary=🔑 Secret Scan: $COUNT findings" >> $GITHUB_OUTPUT
+
   snyk-scan:
     runs-on: ubuntu-latest
+    needs: secret-scan
+    outputs:
+      sca_summary: ${{ steps.save_summary.outputs.summary }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: '23'
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
+
       - name: Install dependencies
         run: pip install -r requirements.txt
+
       - name: Install Snyk
         run: npm install -g snyk
+
       - name: Authenticate Snyk
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: snyk auth $SNYK_TOKEN
+
       - name: Snyk test
-        run: snyk test --file=requirements.txt || true
+        run: snyk test --file=requirements.txt --json > snyk_report.json || true
+
+      - name: Upload snyk report
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-report
+          path: snyk_report.json
+
+      - name: Save SCA summary
+        id: save_summary
+        run: |
+          COUNT=$(jq '.vulnerabilities | length' snyk_report.json)
+          echo "summary=🪲 SCA (Snyk): $COUNT vulnerabilities" >> $GITHUB_OUTPUT
 
   dast-scan:
     runs-on: ubuntu-latest
     needs: snyk-scan
-
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -75,14 +106,30 @@ jobs:
         with:
           name: zap-baseline-report
           path: zap-reports/zap_baseline_report.html
-          
+
+      - name: Save DAST summary
+        id: save_summary
+        run: |
+          WARN=$(grep "WARN-NEW" zap-reports/zap_baseline_report.html | grep -oE '[0-9]+' | head -n1 || echo 0)
+          echo "summary=🛡️ DAST (ZAP): $WARN warnings" >> $GITHUB_OUTPUT
+
       - name: Notify Discord
         if: always()
         run: |
           STATUS="${{ job.status }}"
+          SECRET="${{ needs.secret-scan.outputs.secret_summary }}"
+          SCA="${{ needs.snyk-scan.outputs.sca_summary }}"
+          DAST="${{ steps.save_summary.outputs.summary }}"
           curl -H "Content-Type: application/json" \
             -X POST \
-            -d "{\"content\": \"🚨 DevSecOps Pipeline status: $STATUS (Secret Scan, SCA, DAST done). Check the uploaded reports.\"}" \
+            -d "{
+              \"content\": \"🚨 *DevSecOps Pipeline Summary*\n
+              $SECRET\n
+              $SCA\n
+              $DAST\n
+              **Pipeline status**: $STATUS\n
+              👉 [View artifact](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\"
+            }" \
             ${{ secrets.DISCORD_WEBHOOK_URL }}
 
       # ⚠️ uncomment kalau mau upload full scan
