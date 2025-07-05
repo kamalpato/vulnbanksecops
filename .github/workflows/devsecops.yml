@@ -194,9 +194,7 @@ jobs:
         with:
           name: devsecops-summary
           path: summary.txt
-
-
-
+.
 
       # ⚠️ uncomment kalau mau upload full ZAP report
       # - name: Upload Full ZAP Report
