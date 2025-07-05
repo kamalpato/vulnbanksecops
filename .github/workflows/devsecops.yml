@@ -35,7 +35,7 @@ jobs:
           else
             COUNT=0
           fi
-          echo "summary=🔑 Secret Scan: $COUNT findings" >> $GITHUB_OUTPUT
+          echo "summary= $COUNT findings" >> $GITHUB_OUTPUT
 
   snyk-scan:
     runs-on: ubuntu-latest
