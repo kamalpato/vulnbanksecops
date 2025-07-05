@@ -30,12 +30,12 @@ jobs:
       - name: Save Secret Scan summary
         id: save_summary
         run: |
-          COUNT=$(jq 'length' trufflehog_report.json 2>/dev/null || echo 0)
-          if [ "$COUNT" -eq 0 ]; then
-            echo "summary=0 findings" >> $GITHUB_OUTPUT
+          if [ -s trufflehog_report.json ]; then
+            COUNT=$(jq 'length' trufflehog_report.json 2>/dev/null || echo 0)
           else
-            echo "summary=$COUNT findings" >> $GITHUB_OUTPUT
+            COUNT=0
           fi
+          echo "summary=🔑 Secret Scan: $COUNT findings" >> $GITHUB_OUTPUT
 
   snyk-scan:
     runs-on: ubuntu-latest
