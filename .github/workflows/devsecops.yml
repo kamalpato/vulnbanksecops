@@ -203,10 +203,10 @@ jobs:
           [ -z "$SAST" ] && SAST="🧩 SAST: N/A"
           [ -z "$DAST" ] && DAST="🛡️ DAST: N/A"
 
-            get timestamp
+          # get timestamp
           TIME=$(TZ=Asia/Jakarta date "+%Y-%m-%d %H:%M WIB")
           STATUS="completed"
-          CONTENT="🚨 *DevSecOps Pipeline Report* 🚨\n$SECRET\n$SCA\n$SAST\n$DAST\n**Pipeline status**: $STATUS\n👉 https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          CONTENT="🚨 *DevSecOps Pipeline Report* 🚨\n$SECRET\n$SCA\n$SAST\n$DAST\n**Pipeline status**: $STATUS\n🕐 Time: $TIME\n👉 https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
           curl -H "Content-Type: application/json" \
             -X POST \
