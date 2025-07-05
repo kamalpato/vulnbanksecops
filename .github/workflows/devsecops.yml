@@ -116,28 +116,27 @@ jobs:
       - name: Notify Discord
         if: always()
         run: |
-          # fallback manual bash, bukan di ${{ }}
+          # assign dari Github context ke var shell
           SECRET="${{ needs.secret-scan.outputs.secret_summary }}"
           SCA="${{ needs.snyk-scan.outputs.sca_summary }}"
           DAST="${{ steps.save_summary.outputs.summary }}"
 
           # fallback kalau kosong
-          if [ -z "$SECRET" ]; then SECRET="🔑 Secret Scan: N/A"; fi
-          if [ -z "$SCA" ]; then SCA="🪲 SCA: N/A"; fi
-          if [ -z "$DAST" ]; then DAST="🛡️ DAST (ZAP): N/A"; fi
+          [ -z "$SECRET" ] && SECRET="🔑 Secret Scan: N/A"
+          [ -z "$SCA" ] && SCA="🪲 SCA: N/A"
+          [ -z "$DAST" ] && DAST="🛡️ DAST (ZAP): N/A"
 
           STATUS="completed"
+
+          # safe encode double quotes
+          CONTENT="🚨 *DevSecOps Pipeline Summary*\n$SECRET\n$SCA\n$DAST\n**Pipeline status**: $STATUS\n👉 https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          # send discord
           curl -H "Content-Type: application/json" \
             -X POST \
-            -d "{
-              \"content\": \"🚨 *DevSecOps Pipeline Summary*\n
-              $SECRET\n
-              $SCA\n
-              $DAST\n
-              **Pipeline status**: $STATUS\n
-              👉 [View artifact](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\"
-            }" \
+            -d "{\"content\": \"$CONTENT\"}" \
             ${{ secrets.DISCORD_WEBHOOK_URL }}
+
 
 
       # ⚠️ uncomment kalau mau upload full scan
