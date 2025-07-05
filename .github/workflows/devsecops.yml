@@ -153,9 +153,9 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     needs: [secret-scan, snyk-scan, sast-scan, dast-scan]
+    if: always()
     steps:
       - name: Notify Discord
-        if: always()
         run: |
           SECRET_COUNT="${{ needs.secret-scan.outputs.secret_summary }}"
           SCA_COUNT="${{ needs.snyk-scan.outputs.sca_summary }}"
@@ -191,7 +191,7 @@ jobs:
         with:
           name: devsecops-summary
           path: summary.txt
-
+.
 
 
       # ⚠️ uncomment kalau mau upload full ZAP report
