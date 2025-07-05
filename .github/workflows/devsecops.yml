@@ -150,27 +150,21 @@ jobs:
           fi
           echo "summary=$WARN warnings, $FAIL fails" >> $GITHUB_OUTPUT
 
-  notify:
-    runs-on: ubuntu-latest
-    needs: [secret-scan, snyk-scan, sast-scan, dast-scan]
-    if: always()
-    steps:
       - name: Notify Discord
+        env:
+          SECRET_COUNT: ${{ needs.secret-scan.outputs.secret_summary }}
+          SCA_COUNT: ${{ needs.snyk-scan.outputs.sca_summary }}
+          SAST_COUNT: ${{ needs.sast-scan.outputs.sast_summary }}
+          DAST_COUNT: ${{ needs.dast-scan.outputs.dast_summary }}
+          SECRET_STATUS: ${{ needs.secret-scan.result }}
+          SCA_STATUS: ${{ needs.snyk-scan.result }}
+          SAST_STATUS: ${{ needs.sast-scan.result }}
+          DAST_STATUS: ${{ needs.dast-scan.result }}
         run: |
-          SECRET_COUNT="${{ needs.secret-scan.outputs.secret_summary }}"
-          SCA_COUNT="${{ needs.snyk-scan.outputs.sca_summary }}"
-          SAST_COUNT="${{ needs.sast-scan.outputs.sast_summary }}"
-          DAST_COUNT="${{ needs.dast-scan.outputs.dast_summary }}"
-
           [ -z "$SECRET_COUNT" ] && SECRET_COUNT="N/A"
           [ -z "$SCA_COUNT" ] && SCA_COUNT="N/A"
           [ -z "$SAST_COUNT" ] && SAST_COUNT="N/A"
           [ -z "$DAST_COUNT" ] && DAST_COUNT="N/A"
-
-          SECRET_STATUS="${{ needs.secret-scan.result }}"
-          SCA_STATUS="${{ needs.snyk-scan.result }}"
-          SAST_STATUS="${{ needs.sast-scan.result }}"
-          DAST_STATUS="${{ needs.dast-scan.result }}"
 
           TIME=$(TZ=Asia/Jakarta date "+%Y-%m-%d %H:%M WIB")
 
@@ -194,6 +188,7 @@ jobs:
         with:
           name: devsecops-summary
           path: summary.txt
+
 .
 
       # ⚠️ uncomment kalau mau upload full ZAP report
