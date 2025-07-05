@@ -32,7 +32,11 @@ jobs:
       - name: Save Secret Scan summary
         id: save_summary
         run: |
-          COUNT=$(jq '.[] | length' trufflehog_report.json 2>/dev/null || echo 0)
+          if [ -s trufflehog_report.json ]; then
+            COUNT=$(jq 'length' trufflehog_report.json 2>/dev/null || echo 0)
+          else
+            COUNT=0
+          fi
           echo "summary=🔑 Secret Scan: $COUNT findings" >> $GITHUB_OUTPUT
 
   snyk-scan:
@@ -110,8 +114,14 @@ jobs:
       - name: Save DAST summary
         id: save_summary
         run: |
-          WARN=$(grep "WARN-NEW" zap-reports/zap_baseline_report.html | grep -oE '[0-9]+' | head -n1 || echo 0)
-          echo "summary=🛡️ DAST (ZAP): $WARN warnings" >> $GITHUB_OUTPUT
+          if [ -f zap-reports/zap_baseline_report.html ]; then
+            WARN=$(grep -o 'WARN' zap-reports/zap_baseline_report.html | wc -l)
+            FAIL=$(grep -o 'FAIL' zap-reports/zap_baseline_report.html | wc -l)
+          else
+            WARN=0
+            FAIL=0
+          fi
+          echo "summary=🛡️ DAST (ZAP): $WARN warnings, $FAIL fails" >> $GITHUB_OUTPUT
 
       - name: Notify Discord
         if: always()
