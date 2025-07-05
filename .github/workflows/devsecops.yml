@@ -42,7 +42,7 @@ jobs:
         with:
           node-version: '23'
 
-      - name: Install Python
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
@@ -63,4 +63,3 @@ jobs:
 
       - name: Snyk test dependencies
         run: snyk test --file=requirements.txt || true
-
