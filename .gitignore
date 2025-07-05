@@ -1,0 +1,26 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtualenv
+venv/
+ENV/
+
+# IDE / editor
+.vscode/
+.idea/
+
+# Environment variable
+.env
+
+# Docker named volumes (kalau pakai bind mount juga)
+postgres_data/
+
+# Uploads static
+static/uploads/
+
+# Database file (kalau pernah pakai SQLite)
+*.sqlite3
+
+# Mac system
+.DS_Store

@@ -1,0 +1,31 @@
+name: DevSecOps Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install TruffleHog
+        run: |
+          pip install trufflehog
+
+      - name: Run TruffleHog scan
+        run: |
+          trufflehog git file://. --json > trufflehog_report.json || true
+
+      - name: Upload TruffleHog report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trufflehog-report
+          path: trufflehog_report.json

@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "4000:4000"
+    environment:
+      - DB_NAME=vuln_bank
+      - DB_USER=vulnbank_su
+      - DB_PASSWORD=vulnbankpass
+      - DB_HOST=db 
+      - DB_PORT=5432
+    depends_on:
+      - db
+    volumes:
+      - ./static/uploads:/app/static/uploads
+    networks:
+      - vuln_network
+
+  db:
+    image: postgres:13
+    environment:
+      - POSTGRES_DB=vuln_bank
+      - POSTGRES_USER=vulnbank_su
+      - POSTGRES_PASSWORD=vulnbankpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - vuln_network
+
+volumes:
+  postgres_data:
+
+networks:
+  vuln_network:
+    driver: bridge
