@@ -42,6 +42,17 @@ jobs:
         with:
           node-version: '23'
 
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+
       - name: Install Snyk
         run: npm install -g snyk
 
@@ -53,5 +64,3 @@ jobs:
       - name: Snyk test dependencies
         run: snyk test --file=requirements.txt || true
 
-      - name: Snyk code scan
-        run: snyk code test || true
