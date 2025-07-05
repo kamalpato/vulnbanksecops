@@ -75,6 +75,15 @@ jobs:
         with:
           name: zap-baseline-report
           path: zap-reports/zap_baseline_report.html
+          
+      - name: Notify Discord
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d "{\"content\": \"🚨 DevSecOps Pipeline status: $STATUS (Secret Scan, SCA, DAST done). Check the uploaded reports.\"}" \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
 
       # ⚠️ uncomment kalau mau upload full scan
       # - name: Upload Full ZAP Report
