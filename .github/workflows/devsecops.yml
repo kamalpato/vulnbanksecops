@@ -61,6 +61,11 @@ jobs:
           docker --version
           docker compose version
 
+      - name: Ensure zap-reports folder
+        run: |
+          mkdir -p zap-reports
+          chmod 777 zap-reports
+
       - name: Run ZAP scan via Docker Compose
         run: |
           docker compose -f docker-compose.ci.yml up --abort-on-container-exit
@@ -71,7 +76,7 @@ jobs:
           name: zap-baseline-report
           path: zap-reports/zap_baseline_report.html
 
-      # ⚠️ uncomment kalau mau full scan
+      # ⚠️ uncomment kalau mau upload full scan
       # - name: Upload Full ZAP Report
       #   uses: actions/upload-artifact@v4
       #   with:
