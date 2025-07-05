@@ -127,10 +127,11 @@ jobs:
               $SECRET\n
               $SCA\n
               $DAST\n
-              **Pipeline status**: $STATUS\n
+              **Pipeline status**: ${STATUS}\n
               👉 [View artifact](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\"
             }" \
             ${{ secrets.DISCORD_WEBHOOK_URL }}
+
 
       # ⚠️ uncomment kalau mau upload full scan
       # - name: Upload Full ZAP Report
