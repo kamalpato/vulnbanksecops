@@ -29,3 +29,29 @@ jobs:
         with:
           name: trufflehog-report
           path: trufflehog_report.json
+
+  snyk-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '23'
+
+      - name: Install Snyk
+        run: npm install -g snyk
+
+      - name: Authenticate Snyk
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: snyk auth $SNYK_TOKEN
+
+      - name: Snyk test dependencies
+        run: snyk test --file=requirements.txt || true
+
+      - name: Snyk code scan
+        run: snyk code test || true
