@@ -32,7 +32,7 @@ jobs:
       - name: Save Secret Scan summary
         id: save_summary
         run: |
-          COUNT=$(jq '.[] | length' trufflehog_report.json || echo 0)
+          COUNT=$(jq '.[] | length' trufflehog_report.json 2>/dev/null || echo 0)
           echo "summary=🔑 Secret Scan: $COUNT findings" >> $GITHUB_OUTPUT
 
   snyk-scan:
