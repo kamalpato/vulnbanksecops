@@ -2,11 +2,9 @@ name: DevSecOps Pipeline
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   secret-scan:
@@ -51,12 +49,12 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: '23'
+          node-version: 23
 
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: 3.11
 
       - name: Install dependencies
         run: pip install -r requirements.txt
@@ -72,7 +70,7 @@ jobs:
       - name: Snyk test
         run: snyk test --file=requirements.txt --json > snyk_report.json || true
 
-      - name: Upload snyk report
+      - name: Upload Snyk report
         uses: actions/upload-artifact@v4
         with:
           name: snyk-report
@@ -81,12 +79,36 @@ jobs:
       - name: Save SCA summary
         id: save_summary
         run: |
-          COUNT=$(jq '.vulnerabilities | length' snyk_report.json || echo 0)
+          COUNT=$(jq '.vulnerabilities | length' snyk_report.json 2>/dev/null || echo 0)
           echo "summary=🪲 SCA (Snyk): $COUNT vulnerabilities" >> $GITHUB_OUTPUT
+
+  sast-scan:
+    runs-on: ubuntu-latest
+    needs: [secret-scan, snyk-scan]
+    outputs:
+      sast_summary: ${{ steps.save_summary.outputs.summary }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@master
+        with:
+          projectBaseDir: .
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: "http://localhost:9000"
+
+      - name: Save SAST summary
+        id: save_summary
+        run: |
+          echo "summary=🧩 SAST (SonarQube): scan completed (see dashboard)" >> $GITHUB_OUTPUT
 
   dast-scan:
     runs-on: ubuntu-latest
-    needs: [secret-scan, snyk-scan]
+    needs: [secret-scan, snyk-scan, sast-scan]
+    outputs:
+      dast_summary: ${{ steps.save_summary.outputs.summary }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -105,7 +127,7 @@ jobs:
         run: |
           docker compose -f docker-compose.ci.yml up --abort-on-container-exit || true
 
-      - name: Upload Baseline ZAP Report
+      - name: Upload ZAP Report
         uses: actions/upload-artifact@v4
         with:
           name: zap-baseline-report
@@ -123,31 +145,31 @@ jobs:
           fi
           echo "summary=🛡️ DAST (ZAP): $WARN warnings, $FAIL fails" >> $GITHUB_OUTPUT
 
+  notify:
+    runs-on: ubuntu-latest
+    needs: [secret-scan, snyk-scan, sast-scan, dast-scan]
+    steps:
       - name: Notify Discord
         if: always()
         run: |
-          # assign dari Github context ke var shell
           SECRET="${{ needs.secret-scan.outputs.secret_summary }}"
           SCA="${{ needs.snyk-scan.outputs.sca_summary }}"
-          DAST="${{ steps.save_summary.outputs.summary }}"
+          SAST="${{ needs.sast-scan.outputs.sast_summary }}"
+          DAST="${{ needs.dast-scan.outputs.dast_summary }}"
 
-          # fallback kalau kosong
+          # fallback
           [ -z "$SECRET" ] && SECRET="🔑 Secret Scan: N/A"
           [ -z "$SCA" ] && SCA="🪲 SCA: N/A"
-          [ -z "$DAST" ] && DAST="🛡️ DAST (ZAP): N/A"
+          [ -z "$SAST" ] && SAST="🧩 SAST: N/A"
+          [ -z "$DAST" ] && DAST="🛡️ DAST: N/A"
 
           STATUS="completed"
+          CONTENT="🚨 *DevSecOps Pipeline Summary*\n$SECRET\n$SCA\n$SAST\n$DAST\n**Pipeline status**: $STATUS\n👉 https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          # safe encode double quotes
-          CONTENT="🚨 *DevSecOps Pipeline Summary*\n$SECRET\n$SCA\n$DAST\n**Pipeline status**: $STATUS\n👉 https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
-          # send discord
           curl -H "Content-Type: application/json" \
             -X POST \
             -d "{\"content\": \"$CONTENT\"}" \
             ${{ secrets.DISCORD_WEBHOOK_URL }}
-
-
 
       # ⚠️ uncomment kalau mau upload full scan
       # - name: Upload Full ZAP Report
