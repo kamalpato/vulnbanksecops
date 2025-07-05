@@ -32,7 +32,7 @@ jobs:
       - name: Save Secret Scan summary
         id: save_summary
         run: |
-          COUNT=$(jq '.[] | length' trufflehog_report.json)
+          COUNT=$(jq '.[] | length' trufflehog_report.json || echo 0)
           echo "summary=🔑 Secret Scan: $COUNT findings" >> $GITHUB_OUTPUT
 
   snyk-scan:
@@ -77,7 +77,7 @@ jobs:
       - name: Save SCA summary
         id: save_summary
         run: |
-          COUNT=$(jq '.vulnerabilities | length' snyk_report.json)
+          COUNT=$(jq '.vulnerabilities | length' snyk_report.json || echo 0)
           echo "summary=🪲 SCA (Snyk): $COUNT vulnerabilities" >> $GITHUB_OUTPUT
 
   dast-scan:
@@ -116,10 +116,10 @@ jobs:
       - name: Notify Discord
         if: always()
         run: |
-          STATUS="${{ job.status }}"
-          SECRET="${{ needs.secret-scan.outputs.secret_summary }}"
-          SCA="${{ needs.snyk-scan.outputs.sca_summary }}"
-          DAST="${{ steps.save_summary.outputs.summary }}"
+          SECRET="${{ needs.secret-scan.outputs.secret_summary || '🔑 Secret Scan: N/A' }}"
+          SCA="${{ needs.snyk-scan.outputs.sca_summary || '🪲 SCA: N/A' }}"
+          DAST="${{ steps.save_summary.outputs.summary || '🛡️ DAST: N/A' }}"
+          STATUS="${{ needs.secret-scan.result }}"
           curl -H "Content-Type: application/json" \
             -X POST \
             -d "{
@@ -131,7 +131,6 @@ jobs:
               👉 [View artifact](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\"
             }" \
             ${{ secrets.DISCORD_WEBHOOK_URL }}
-
 
       # ⚠️ uncomment kalau mau upload full scan
       # - name: Upload Full ZAP Report
