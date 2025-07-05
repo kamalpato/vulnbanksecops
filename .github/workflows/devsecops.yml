@@ -63,31 +63,31 @@ jobs:
         run: snyk test --file=requirements.txt || true
 
     dast-scan:
-    runs-on: ubuntu-latest
-    needs: snyk-scan
+      runs-on: ubuntu-latest
+      needs: snyk-scan
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      steps:
+        - name: Checkout repository
+          uses: actions/checkout@v3
 
-      - name: Install Docker Compose plugin
-        run: |
-          sudo apt-get update
-          sudo apt-get install docker-compose-plugin
+        - name: Install Docker Compose plugin
+          run: |
+            sudo apt-get update
+            sudo apt-get install docker-compose-plugin
 
-      - name: Run ZAP scan via Docker Compose
-        run: |
-          docker compose -f docker-compose.ci.yml up --abort-on-container-exit
+        - name: Run ZAP scan via Docker Compose
+          run: |
+            docker compose -f docker-compose.ci.yml up --abort-on-container-exit
 
-      - name: Upload Baseline ZAP Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: zap-baseline-report
-          path: zap-reports/zap_baseline_report.html
+        - name: Upload Baseline ZAP Report
+          uses: actions/upload-artifact@v4
+          with:
+            name: zap-baseline-report
+            path: zap-reports/zap_baseline_report.html
 
-      # ⚠️ uncomment kalau mau full scan
-      # - name: Upload Full ZAP Report
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: zap-full-report
-      #     path: zap-reports/zap_full_report.html
+        # ⚠️ uncomment kalau mau full scan
+        # - name: Upload Full ZAP Report
+        #   uses: actions/upload-artifact@v4
+        #   with:
+        #     name: zap-full-report
+        #     path: zap-reports/zap_full_report.html
