@@ -32,7 +32,7 @@ jobs:
         run: |
           COUNT=$(jq 'length' trufflehog_report.json 2>/dev/null || echo 0)
           if [ "$COUNT" -eq 0 ]; then
-            echo "summary=clean" >> $GITHUB_OUTPUT
+            echo "summary=0 findings" >> $GITHUB_OUTPUT
           else
             echo "summary=$COUNT findings" >> $GITHUB_OUTPUT
           fi
