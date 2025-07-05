@@ -167,15 +167,18 @@ jobs:
           [ -z "$SAST_COUNT" ] && SAST_COUNT="N/A"
           [ -z "$DAST_COUNT" ] && DAST_COUNT="N/A"
 
+          SECRET_STATUS="${{ needs.secret-scan.result }}"
+          SCA_STATUS="${{ needs.snyk-scan.result }}"
+          SAST_STATUS="${{ needs.sast-scan.result }}"
+          DAST_STATUS="${{ needs.dast-scan.result }}"
+
           TIME=$(TZ=Asia/Jakarta date "+%Y-%m-%d %H:%M WIB")
-          STATUS="completed"
 
           CONTENT="🚨 DevSecOps Pipeline Report 🚨\n"
-          CONTENT+="🔑 Secret Scan: $SECRET_COUNT\n"
-          CONTENT+="🪲 SCA (Snyk): $SCA_COUNT\n"
-          CONTENT+="🧩 SAST (Bandit): $SAST_COUNT\n"
-          CONTENT+="🛡️ DAST (ZAP): $DAST_COUNT\n"
-          CONTENT+="Pipeline status: $STATUS\n"
+          CONTENT+="🔑 Secret Scan: $SECRET_COUNT (status: $SECRET_STATUS)\n"
+          CONTENT+="🪲 SCA (Snyk): $SCA_COUNT (status: $SCA_STATUS)\n"
+          CONTENT+="🧩 SAST (Bandit): $SAST_COUNT (status: $SAST_STATUS)\n"
+          CONTENT+="🛡️ DAST (ZAP): $DAST_COUNT (status: $DAST_STATUS)\n"
           CONTENT+="🕐 Time: $TIME\n"
           CONTENT+="👉 https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
@@ -191,7 +194,8 @@ jobs:
         with:
           name: devsecops-summary
           path: summary.txt
-.
+
+
 
 
       # ⚠️ uncomment kalau mau upload full ZAP report
