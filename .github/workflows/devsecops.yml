@@ -180,12 +180,12 @@ jobs:
           [ -z "$SAST" ] && SAST="✅ SAST: Clean"
           [ -z "$DAST" ] && DAST="✅ DAST: Clean"
 
+          # get timestamp
           TIME=$(TZ=Asia/Jakarta date "+%Y-%m-%d %H:%M WIB")
           STATUS="completed"
 
-          CONTENT="🚨 *DevSecOps Pipeline Report* 🚨\n\n$SECRET\n$SCA\n$SAST\n$DAST\n\n🔗 Repo: vuln-bank\n🕐 Time: $TIME\n👉 https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          CONTENT="🚨 DevSecOps Pipeline Report 🚨\n\n$SECRET\n$SCA\n$SAST\n$DAST\n\n🔗 Repo: vuln-bank\n🕐 Time: $TIME\n👉 https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          # Save as artifact also
           echo "$CONTENT" > summary.txt
 
           curl -H "Content-Type: application/json" \
@@ -199,9 +199,7 @@ jobs:
           name: devsecops-summary
           path: summary.txt
 
-
-
-      # ⚠️ uncomment kalau mau upload full scan
+      # ⚠️ uncomment kalau mau upload full ZAP report
       # - name: Upload Full ZAP Report
       #   uses: actions/upload-artifact@v4
       #   with:
