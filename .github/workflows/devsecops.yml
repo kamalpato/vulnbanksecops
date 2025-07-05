@@ -67,7 +67,7 @@ jobs:
     needs: snyk-scan
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Build vuln-bank
@@ -78,15 +78,18 @@ jobs:
           docker run -d --name vuln-bank -p 4000:4000 vuln-bank-image
           sleep 20
 
-      - name: ZAP scan
+      - name: Pull ZAP
+        run: docker pull ghcr.io/zaproxy/zaproxy:stable
+
+      - name: Run ZAP baseline scan
         run: |
           docker run --network="host" \
             -v $(pwd):/zap/wrk/:rw \
-            owasp/zap2docker-stable zap-baseline.py \
+            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
               -t http://localhost:4000 \
               -r zap_report.html || true
 
-      - name: Upload report
+      - name: Upload ZAP report
         uses: actions/upload-artifact@v4
         with:
           name: zap-report
