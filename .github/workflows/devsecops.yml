@@ -70,30 +70,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Build vuln-bank
-        run: docker build -t vuln-bank-image .
-
-      - name: Run vuln-bank
+      - name: Run ZAP scan via Docker Compose
         run: |
-          docker run -d --name vuln-bank -p 4000:4000 vuln-bank-image
-          sleep 20
+          docker-compose -f docker-compose.ci.yml up --abort-on-container-exit
 
-      - name: Pull ZAP
-        run: docker pull ghcr.io/zaproxy/zaproxy:stable
-
-      - name: Run ZAP baseline scan
-        run: |
-          docker run --network="host" \
-            -v $(pwd):/zap/wrk/:rw \
-            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
-              -t http://localhost:4000 \
-              -r zap_report.html || true
-
-      - name: Upload ZAP report
+      - name: Upload Baseline ZAP Report
         uses: actions/upload-artifact@v4
         with:
-          name: zap-report
-          path: zap_report.html
+          name: zap-baseline-report
+          path: zap-reports/zap_baseline_report.html
 
-      - name: Stop vuln-bank
-        run: docker stop vuln-bank || true
+      # ⚠️ uncomment kalau mau full scan
+      # - name: Upload Full ZAP Report
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: zap-full-report
+      #     path: zap-reports/zap_full_report.html

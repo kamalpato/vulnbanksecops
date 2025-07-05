@@ -13,10 +13,10 @@ ENV/
 # Environment variable
 .env
 
-# Docker named volumes (kalau pakai bind mount juga)
+# Docker named volumes
 postgres_data/
 
-# Uploads static
+# Uploads static (user-uploaded files)
 static/uploads/
 
 # Database file (kalau pernah pakai SQLite)
@@ -24,3 +24,9 @@ static/uploads/
 
 # Mac system
 .DS_Store
+
+# ZAP reports
+zap-reports/
+
+# Compose override
+docker-compose.override.yml

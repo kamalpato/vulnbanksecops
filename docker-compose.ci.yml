@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "4000:4000"
+    networks:
+      - vulnnet
+
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    command: >
+      zap-baseline.py
+      -t http://web:4000
+      -r zap_baseline_report.html
+    networks:
+      - vulnnet
+    volumes:
+      - ./zap-reports:/zap/wrk
+
+  # ⚠️ uncomment ini kalau mau ZAP full scan aktif
+  # zap-full:
+  #   image: ghcr.io/zaproxy/zaproxy:stable
+  #   command: >
+  #     zap-full-scan.py
+  #     -t http://web:4000
+  #     -r zap_full_report.html
+  #   networks:
+  #     - vulnnet
+  #   volumes:
+  #     - ./zap-reports:/zap/wrk
+
+networks:
+  vulnnet:
