@@ -154,50 +154,34 @@ jobs:
     runs-on: ubuntu-latest
     if: always()
     steps:
-    - name: Notify Discord
-      env:
-        SECRET_COUNT: ${{ needs.secret-scan.outputs.secret_summary }}
-        SCA_COUNT: ${{ needs.snyk-scan.outputs.sca_summary }}
-        SAST_COUNT: ${{ needs.sast-scan.outputs.sast_summary }}
-        DAST_COUNT: ${{ needs.dast-scan.outputs.dast_summary }}
+      - name: Notify Discord
+        run: |
+          TIME=$(TZ=Asia/Jakarta date "+%Y-%m-%d %H:%M WIB")
+          CONCLUSION="${{ github.job }}" # name of current job
+          WORKFLOW_STATUS="${{ github.workflow }}" # workflow name
 
-        SECRET_STATUS: ${{ needs.secret-scan.result }}
-        SCA_STATUS: ${{ needs.snyk-scan.result }}
-        SAST_STATUS: ${{ needs.sast-scan.result }}
-        DAST_STATUS: ${{ needs.dast-scan.result }}
+          CONTENT="🚨 *DevSecOps Pipeline Report* 🚨\n"
+          CONTENT+="Pipeline: *${{ github.workflow }}*\n"
+          CONTENT+="Status: *${{ job.status }}*\n"
+          CONTENT+="🕐 Time: $TIME\n"
+          CONTENT+="👉 <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}>"
 
-      run: |
-        [ -z "$SECRET_COUNT" ] && SECRET_COUNT="N/A"
-        [ -z "$SCA_COUNT" ] && SCA_COUNT="N/A"
-        [ -z "$SAST_COUNT" ] && SAST_COUNT="N/A"
-        [ -z "$DAST_COUNT" ] && DAST_COUNT="N/A"
+          echo -e "$CONTENT" > summary.txt
+          JSON_CONTENT=$(jq -Rs . < summary.txt)
 
-        TIME=$(TZ=Asia/Jakarta date "+%Y-%m-%d %H:%M WIB")
-
-        CONTENT="🚨 *DevSecOps Pipeline Report* 🚨\n"
-        CONTENT+="🔑 Secret Scan: $SECRET_COUNT (status: *$SECRET_STATUS*)\n"
-        CONTENT+="🪲 SCA (Snyk): $SCA_COUNT (status: *$SCA_STATUS*)\n"
-        CONTENT+="🧩 SAST (Bandit): $SAST_COUNT (status: *$SAST_STATUS*)\n"
-        CONTENT+="🛡️ DAST (ZAP): $DAST_COUNT (status: *$DAST_STATUS*)\n"
-        CONTENT+="📄 Pipeline status: *$SECRET_STATUS / $SCA_STATUS / $SAST_STATUS / $DAST_STATUS*\n"
-        CONTENT+="🕐 Time: $TIME\n"
-        CONTENT+="👉 <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}>"
-
-        echo -e "$CONTENT" > summary.txt
-
-        JSON_CONTENT=$(jq -Rs . < summary.txt)
-
-        curl -H "Content-Type: application/json" \
-            -X POST \
-            -d "{\"content\": $JSON_CONTENT}" \
-            ${{ secrets.DISCORD_WEBHOOK_URL }}
-
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "{\"content\": $JSON_CONTENT}" \
+               ${{ secrets.DISCORD_WEBHOOK_URL }}
 
       - name: Upload summary
         uses: actions/upload-artifact@v4
         with:
           name: devsecops-summary
           path: summary.txt
+
+
+.
 
       # ⚠️ uncomment kalau mau upload full ZAP report
       # - name: Upload Full ZAP Report
