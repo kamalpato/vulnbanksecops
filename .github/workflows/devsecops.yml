@@ -192,8 +192,6 @@ jobs:
           name: devsecops-summary
           path: summary.txt
 
-
-
       # ⚠️ uncomment kalau mau upload full ZAP report
       # - name: Upload Full ZAP Report
       #   uses: actions/upload-artifact@v4
