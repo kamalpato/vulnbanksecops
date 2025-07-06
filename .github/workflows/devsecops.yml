@@ -150,17 +150,25 @@ jobs:
           fi
           echo "summary=$WARN warnings, $FAIL fails" >> $GITHUB_OUTPUT
 
+  notify:
+    runs-on: ubuntu-latest
+    needs: [secret-scan, snyk-scan, sast-scan, dast-scan]
+    if: always()
+    steps:
       - name: Notify Discord
-        env:
-          SECRET_COUNT: ${{ needs.secret-scan.outputs.secret_summary }}
-          SCA_COUNT: ${{ needs.snyk-scan.outputs.sca_summary }}
-          SAST_COUNT: ${{ needs.sast-scan.outputs.sast_summary }}
-          DAST_COUNT: ${{ needs.dast-scan.outputs.dast_summary }}
-          SECRET_STATUS: ${{ needs.secret-scan.result }}
-          SCA_STATUS: ${{ needs.snyk-scan.result }}
-          SAST_STATUS: ${{ needs.sast-scan.result }}
-          DAST_STATUS: ${{ needs.dast-scan.result }}
         run: |
+          SECRET_COUNT="${{ needs.secret-scan.outputs.secret_summary }}"
+          SCA_COUNT="${{ needs.snyk-scan.outputs.sca_summary }}"
+          SAST_COUNT="${{ needs.sast-scan.outputs.sast_summary }}"
+          DAST_COUNT="${{ needs.dast-scan.outputs.dast_summary }}"
+
+          # status masing-masing job
+          SECRET_STATUS="${{ needs.secret-scan.result }}"
+          SCA_STATUS="${{ needs.snyk-scan.result }}"
+          SAST_STATUS="${{ needs.sast-scan.result }}"
+          DAST_STATUS="${{ needs.dast-scan.result }}"
+
+          # fallback jika kosong
           [ -z "$SECRET_COUNT" ] && SECRET_COUNT="N/A"
           [ -z "$SCA_COUNT" ] && SCA_COUNT="N/A"
           [ -z "$SAST_COUNT" ] && SAST_COUNT="N/A"
@@ -168,19 +176,23 @@ jobs:
 
           TIME=$(TZ=Asia/Jakarta date "+%Y-%m-%d %H:%M WIB")
 
-          CONTENT="🚨 DevSecOps Pipeline Report 🚨\n"
-          CONTENT+="🔑 Secret Scan: $SECRET_COUNT (status: $SECRET_STATUS)\n"
-          CONTENT+="🪲 SCA (Snyk): $SCA_COUNT (status: $SCA_STATUS)\n"
-          CONTENT+="🧩 SAST (Bandit): $SAST_COUNT (status: $SAST_STATUS)\n"
-          CONTENT+="🛡️ DAST (ZAP): $DAST_COUNT (status: $DAST_STATUS)\n"
+          CONTENT="🚨 *DevSecOps Pipeline Report* 🚨\n"
+          CONTENT+="🔑 Secret Scan: $SECRET_COUNT (status: *$SECRET_STATUS*)\n"
+          CONTENT+="🪲 SCA (Snyk): $SCA_COUNT (status: *$SCA_STATUS*)\n"
+          CONTENT+="🧩 SAST (Bandit): $SAST_COUNT (status: *$SAST_STATUS*)\n"
+          CONTENT+="🛡️ DAST (ZAP): $DAST_COUNT (status: *$DAST_STATUS*)\n"
+          CONTENT+="📄 Pipeline status: *$SECRET_STATUS / $SCA_STATUS / $SAST_STATUS / $DAST_STATUS*\n"
           CONTENT+="🕐 Time: $TIME\n"
-          CONTENT+="👉 https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          CONTENT+="👉 <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}>"
 
-          echo "$CONTENT" > summary.txt
+          echo -e "$CONTENT" > summary.txt
+
+          # escape quote agar json valid
+          JSON_CONTENT=$(jq -Rs . < summary.txt)
 
           curl -H "Content-Type: application/json" \
             -X POST \
-            -d "{\"content\": \"$CONTENT\"}" \
+            -d "{\"content\": $JSON_CONTENT}" \
             ${{ secrets.DISCORD_WEBHOOK_URL }}
 
       - name: Upload summary
@@ -188,6 +200,7 @@ jobs:
         with:
           name: devsecops-summary
           path: summary.txt
+
 
 .
 
