@@ -9,7 +9,6 @@ on:
 jobs:
   secret-scan:
     runs-on: ubuntu-latest
-    continue-on-error: true
     outputs:
       secret_summary: ${{ steps.save_summary.outputs.summary }}
     steps:
@@ -22,15 +21,24 @@ jobs:
       - name: Run TruffleHog
         run: trufflehog git file://. --json > trufflehog_report.json || true
 
+      - name: Upload TruffleHog report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trufflehog-report
+          path: trufflehog_report.json
+
       - name: Save Secret Scan summary
         id: save_summary
         run: |
-          COUNT=$(jq 'length' trufflehog_report.json 2>/dev/null || echo 0)
-          echo "summary=$COUNT findings" >> $GITHUB_OUTPUT
+          if [ -s trufflehog_report.json ]; then
+            COUNT=$(jq 'length' trufflehog_report.json 2>/dev/null || echo 0)
+          else
+            COUNT=0
+          fi
+          echo "summary= $COUNT findings" >> $GITHUB_OUTPUT
 
   snyk-scan:
     runs-on: ubuntu-latest
-    continue-on-error: true
     needs: secret-scan
     outputs:
       sca_summary: ${{ steps.save_summary.outputs.summary }}
@@ -43,6 +51,14 @@ jobs:
         with:
           node-version: 23
 
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
       - name: Install Snyk
         run: npm install -g snyk
 
@@ -54,6 +70,12 @@ jobs:
       - name: Snyk test
         run: snyk test --file=requirements.txt --json > snyk_report.json || true
 
+      - name: Upload Snyk report
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-report
+          path: snyk_report.json
+
       - name: Save SCA summary
         id: save_summary
         run: |
@@ -62,7 +84,6 @@ jobs:
 
   sast-scan:
     runs-on: ubuntu-latest
-    continue-on-error: true
     needs: [secret-scan, snyk-scan]
     outputs:
       sast_summary: ${{ steps.save_summary.outputs.summary }}
@@ -76,6 +97,12 @@ jobs:
       - name: Run Bandit
         run: bandit -r . -f json -o bandit_report.json || true
 
+      - name: Upload Bandit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit_report.json
+
       - name: Save SAST summary
         id: save_summary
         run: |
@@ -84,7 +111,6 @@ jobs:
 
   dast-scan:
     runs-on: ubuntu-latest
-    continue-on-error: true
     needs: [secret-scan, snyk-scan, sast-scan]
     outputs:
       dast_summary: ${{ steps.save_summary.outputs.summary }}
@@ -92,57 +118,86 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Ensure zap-reports folder
-        run: mkdir -p zap-reports
-
-      - name: Run ZAP baseline
+      - name: Check Docker
         run: |
-          echo "<html><body>Dummy ZAP Report</body></html>" > zap-reports/zap_baseline_report.html
+          docker --version
+          docker compose version
+
+      - name: Ensure zap-reports folder
+        run: |
+          mkdir -p zap-reports
+          chmod 777 zap-reports
+
+      - name: Run ZAP scan via Docker Compose
+        run: |
+          docker compose -f docker-compose.ci.yml up --abort-on-container-exit || true
+
+      - name: Upload ZAP Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-baseline-report
+          path: zap-reports/zap_baseline_report.html
 
       - name: Save DAST summary
         id: save_summary
         run: |
-          WARN=0
-          FAIL=0
+          if [ -f zap-reports/zap_baseline_report.html ]; then
+            WARN=$(grep -o 'WARN' zap-reports/zap_baseline_report.html | wc -l)
+            FAIL=$(grep -o 'FAIL' zap-reports/zap_baseline_report.html | wc -l)
+          else
+            WARN=0
+            FAIL=0
+          fi
           echo "summary=$WARN warnings, $FAIL fails" >> $GITHUB_OUTPUT
 
   notify:
     runs-on: ubuntu-latest
     if: always()
-    needs: [secret-scan, snyk-scan, sast-scan, dast-scan]
     steps:
-      - name: Send Discord Notification
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: |
-          TIME=$(TZ=Asia/Jakarta date "+%Y-%m-%d %H:%M WIB")
+    - name: Notify Discord
+      env:
+        SECRET_COUNT: ${{ needs.secret-scan.outputs.secret_summary }}
+        SCA_COUNT: ${{ needs.snyk-scan.outputs.sca_summary }}
+        SAST_COUNT: ${{ needs.sast-scan.outputs.sast_summary }}
+        DAST_COUNT: ${{ needs.dast-scan.outputs.dast_summary }}
 
-          SECRET_SUMMARY="${{ needs.secret-scan.outputs.secret_summary }}"
-          SCA_SUMMARY="${{ needs.snyk-scan.outputs.sca_summary }}"
-          SAST_SUMMARY="${{ needs.sast-scan.outputs.sast_summary }}"
-          DAST_SUMMARY="${{ needs.dast-scan.outputs.dast_summary }}"
+        SECRET_STATUS: ${{ needs.secret-scan.result }}
+        SCA_STATUS: ${{ needs.snyk-scan.result }}
+        SAST_STATUS: ${{ needs.sast-scan.result }}
+        DAST_STATUS: ${{ needs.dast-scan.result }}
 
-          SECRET_STATUS="${{ needs.secret-scan.result }}"
-          SCA_STATUS="${{ needs.snyk-scan.result }}"
-          SAST_STATUS="${{ needs.sast-scan.result }}"
-          DAST_STATUS="${{ needs.dast-scan.result }}"
+      run: |
+        [ -z "$SECRET_COUNT" ] && SECRET_COUNT="N/A"
+        [ -z "$SCA_COUNT" ] && SCA_COUNT="N/A"
+        [ -z "$SAST_COUNT" ] && SAST_COUNT="N/A"
+        [ -z "$DAST_COUNT" ] && DAST_COUNT="N/A"
 
-          CONTENT="🚨 *DevSecOps Pipeline Report* 🚨\n"
-          CONTENT+="🔑 Secret Scan: ${SECRET_SUMMARY:-N/A} (status: *${SECRET_STATUS:-N/A}*)\n"
-          CONTENT+="🪲 SCA: ${SCA_SUMMARY:-N/A} (status: *${SCA_STATUS:-N/A}*)\n"
-          CONTENT+="🧩 SAST: ${SAST_SUMMARY:-N/A} (status: *${SAST_STATUS:-N/A}*)\n"
-          CONTENT+="🛡️ DAST: ${DAST_SUMMARY:-N/A} (status: *${DAST_STATUS:-N/A}*)\n"
-          CONTENT+="📄 Pipeline finished at: $TIME\n"
-          CONTENT+="👉 <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}>"
+        TIME=$(TZ=Asia/Jakarta date "+%Y-%m-%d %H:%M WIB")
 
-          JSON_CONTENT=$(jq -Rs . <<<"$CONTENT")
-          curl -H "Content-Type: application/json" \
-               -X POST \
-               -d "{\"content\": $JSON_CONTENT}" \
-               "$DISCORD_WEBHOOK_URL"
+        CONTENT="🚨 *DevSecOps Pipeline Report* 🚨\n"
+        CONTENT+="🔑 Secret Scan: $SECRET_COUNT (status: *$SECRET_STATUS*)\n"
+        CONTENT+="🪲 SCA (Snyk): $SCA_COUNT (status: *$SCA_STATUS*)\n"
+        CONTENT+="🧩 SAST (Bandit): $SAST_COUNT (status: *$SAST_STATUS*)\n"
+        CONTENT+="🛡️ DAST (ZAP): $DAST_COUNT (status: *$DAST_STATUS*)\n"
+        CONTENT+="📄 Pipeline status: *$SECRET_STATUS / $SCA_STATUS / $SAST_STATUS / $DAST_STATUS*\n"
+        CONTENT+="🕐 Time: $TIME\n"
+        CONTENT+="👉 <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}>"
+
+        echo -e "$CONTENT" > summary.txt
+
+        JSON_CONTENT=$(jq -Rs . < summary.txt)
+
+        curl -H "Content-Type: application/json" \
+            -X POST \
+            -d "{\"content\": $JSON_CONTENT}" \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
 
 
-.
+      - name: Upload summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: devsecops-summary
+          path: summary.txt
 
       # ⚠️ uncomment kalau mau upload full ZAP report
       # - name: Upload Full ZAP Report
