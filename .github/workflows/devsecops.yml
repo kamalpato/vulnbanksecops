@@ -152,7 +152,7 @@ jobs:
 
   notify:
     runs-on: ubuntu-latest
-    needs: [secret-scan, snyk-scan, sast-scan, dast-scan]
+    # needs: [secret-scan, snyk-scan, sast-scan, dast-scan]
     if: always()
     steps:
       - name: Notify Discord
