@@ -35,7 +35,7 @@ jobs:
           else
             COUNT=0
           fi
-          echo "summary= $COUNT findings" >> $GITHUB_OUTPUT
+          echo "summary=$COUNT findings" >> $GITHUB_OUTPUT
 
   snyk-scan:
     runs-on: ubuntu-latest
@@ -152,27 +152,39 @@ jobs:
 
   notify:
     runs-on: ubuntu-latest
-    if: always()
+    needs: [secret-scan, snyk-scan, sast-scan, dast-scan]
     steps:
       - name: Notify Discord
+        if: always()
         run: |
+          SECRET_COUNT="${{ needs.secret-scan.outputs.secret_summary }}"
+          SCA_COUNT="${{ needs.snyk-scan.outputs.sca_summary }}"
+          SAST_COUNT="${{ needs.sast-scan.outputs.sast_summary }}"
+          DAST_COUNT="${{ needs.dast-scan.outputs.dast_summary }}"
+
+          [ -z "$SECRET_COUNT" ] && SECRET_COUNT="N/A"
+          [ -z "$SCA_COUNT" ] && SCA_COUNT="N/A"
+          [ -z "$SAST_COUNT" ] && SAST_COUNT="N/A"
+          [ -z "$DAST_COUNT" ] && DAST_COUNT="N/A"
+
           TIME=$(TZ=Asia/Jakarta date "+%Y-%m-%d %H:%M WIB")
-          CONCLUSION="${{ github.job }}" # name of current job
-          WORKFLOW_STATUS="${{ github.workflow }}" # workflow name
+          STATUS="completed"
 
-          CONTENT="🚨 *DevSecOps Pipeline Report* 🚨\n"
-          CONTENT+="Pipeline: *${{ github.workflow }}*\n"
-          CONTENT+="Status: *${{ job.status }}*\n"
+          CONTENT="🚨 DevSecOps Pipeline Report 🚨\n"
+          CONTENT+="🔑 Secret Scan: $SECRET_COUNT\n"
+          CONTENT+="🪲 SCA (Snyk): $SCA_COUNT\n"
+          CONTENT+="🧩 SAST (Bandit): $SAST_COUNT\n"
+          CONTENT+="🛡️ DAST (ZAP): $DAST_COUNT\n"
+          CONTENT+="Pipeline status: $STATUS\n"
           CONTENT+="🕐 Time: $TIME\n"
-          CONTENT+="👉 <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}>"
+          CONTENT+="👉 https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          echo -e "$CONTENT" > summary.txt
-          JSON_CONTENT=$(jq -Rs . < summary.txt)
+          echo "$CONTENT" > summary.txt
 
           curl -H "Content-Type: application/json" \
-               -X POST \
-               -d "{\"content\": $JSON_CONTENT}" \
-               ${{ secrets.DISCORD_WEBHOOK_URL }}
+            -X POST \
+            -d "{\"content\": \"$CONTENT\"}" \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
 
       - name: Upload summary
         uses: actions/upload-artifact@v4
@@ -181,7 +193,6 @@ jobs:
           path: summary.txt
 
 
-.
 
       # ⚠️ uncomment kalau mau upload full ZAP report
       # - name: Upload Full ZAP Report
